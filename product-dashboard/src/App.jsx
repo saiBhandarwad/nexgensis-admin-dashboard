@@ -1,13 +1,20 @@
 import './App.css'
-
+import DashboardLayout from './layouts/DashboardLayout'
+import Login from './pages/Login'
+import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 function App() {
-  
+  const router = createBrowserRouter([
+    {
+      path: "/",
+      element: <DashboardLayout />
+    },
+    {
+      path: "/login",
+      element: <Login />
+    }
+  ])
   return (
-   <>
-      <h1 class="text-3xl font-bold underline">
-        Hello world!
-      </h1>
-   </>
+    <RouterProvider router={router}></RouterProvider>
   )
 }
 
