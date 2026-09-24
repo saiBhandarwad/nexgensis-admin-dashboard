@@ -1,10 +1,13 @@
 import api from "../api/axios";
 
-export const getProducts = async ({ limit = 10, skip = 0, signal, }) => {
+export const getProducts = async ({ limit = 10, skip = 0, sortBy,
+    order, signal, }) => {
     const response = await api.get("/products", {
         params: {
             limit,
             skip,
+            sortBy,
+            order,
         },
         signal,
     });
@@ -12,12 +15,15 @@ export const getProducts = async ({ limit = 10, skip = 0, signal, }) => {
     return response.data;
 };
 
-export const searchProducts = async ({ query, limit = 10, skip = 0, signal, }) => {
+export const searchProducts = async ({ query, limit = 10, skip = 0, sortBy,
+    order, signal, }) => {
     const response = await api.get("/products/search", {
         params: {
             q: query,
             limit,
             skip,
+            sortBy,
+            order,
         },
         signal,
     });
@@ -31,13 +37,16 @@ export const getCategories = async () => {
     return response.data;
 };
 
-export const getProductsByCategory = async ({ category, limit = 10, skip = 0, signal }) => {
+export const getProductsByCategory = async ({ category, limit = 10, skip = 0, sortBy,
+    order, signal }) => {
     const response = await api.get(
         `/products/category/${category}`,
         {
             params: {
                 limit,
                 skip,
+                sortBy,
+                order,
             },
             signal,
         }

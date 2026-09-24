@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { logoutUser } from "../services/authService";
-import { getProducts, searchProducts } from "../services/productService";
+import { getProducts, searchProducts, getCategories, getProductsByCategory } from "../services/productService";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import useDebounce from "../hooks/Debounce";
 
@@ -18,7 +18,6 @@ export default function DashboardLayout() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-
     // Read values from URL
     const [searchParams, setSearchParams] = useSearchParams();
     const pageParam = Number(searchParams.get("page"));
@@ -26,6 +25,11 @@ export default function DashboardLayout() {
     const searchParam = searchParams.get("search") || "";
     const [searchInput, setSearchInput] = useState(searchParam);
     const debouncedSearch = useDebounce(searchInput, 500);
+
+    const categoryParam = searchParams.get("category") || "";
+    const [categories, setCategories] = useState([]);
+
+    const sortParam = searchParams.get("sort") || "";
 
     // Validate URL values
     const page =
@@ -77,6 +81,18 @@ export default function DashboardLayout() {
         });
     }, [debouncedSearch]);
     useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const data = await getCategories();
+                setCategories(data);
+            } catch (error) {
+                console.error("Failed to load categories");
+            }
+        };
+
+        fetchCategories();
+    }, []);
+    useEffect(() => {
         const controller = new AbortController();
         const fetchProducts = async () => {
             setLoading(true);
@@ -84,14 +100,34 @@ export default function DashboardLayout() {
 
             try {
                 const skip = (page - 1) * limit;
-
+                let sortBy;
+                let order;
                 let data;
+
+                if (sortParam) {
+                    const [field, direction] = sortParam.split("-");
+
+                    sortBy = field;
+                    order = direction;
+                }
+                
 
                 if (searchParam) {
                     data = await searchProducts({
                         query: searchParam,
                         limit,
                         skip,
+                        sortBy,
+                        order,
+                        signal: controller.signal,
+                    });
+                } else if (categoryParam) {
+                    data = await getProductsByCategory({
+                        category: categoryParam,
+                        limit,
+                        skip,
+                        sortBy,
+                        order,
                         signal: controller.signal,
                     });
                 } else {
@@ -104,7 +140,6 @@ export default function DashboardLayout() {
 
                 setProducts(data.products);
                 setTotal(data.total);
-                totalPages = Math.ceil(data.total / limit);
             } catch (error) {
                 if (error.name === "CanceledError") {
                     return;
@@ -127,7 +162,7 @@ export default function DashboardLayout() {
             controller.abort();
         };
 
-    }, [page, limit, searchParam]);
+    }, [page, limit, searchParam, categoryParam, sortParam]);
     const updateParams = (updates) => {
         const params = new URLSearchParams(searchParams);
 
@@ -152,9 +187,7 @@ export default function DashboardLayout() {
                     <p className="text-3xl font-bold text-white">Product Admin</p>
                     <div className="md:hidden text-2xl font-bold " onClick={() => { setSidebarOpen(false) }}>X</div>
                 </div>
-                <p className="text-gray-200 text-xl font-semibold">Dashboard</p>
-                <p className="text-gray-200 text-xl font-semibold">Products</p>
-                <p className="text-gray-200 text-xl font-semibold">Categories</p>
+                <p className="text-gray-200 text-xl font-semibold cursor-pointer hover:underline">Dashboard</p>
                 <button type="button" onClick={handleLogout} className="fixed bottom-0 text-gray-200 flex items-center rounded-md py-2 text-sm font-semibold  cursor-pointer  transition-colors">
                     [➔ Log out
                 </button>
@@ -189,6 +222,73 @@ export default function DashboardLayout() {
                                     setSearchInput(event.target.value);
                                 }}
                             />
+                            {/* category starts */}
+                            <div className="flex items-center gap-3 font-sans">
+                                <label htmlFor="category-select" className="text-sm font-medium text-slate-700">
+                                    Category
+                                </label>
+                                <div className="relative">
+                                    <select
+                                        id="category-select"
+                                        value={categoryParam}
+                                        onChange={(event) => {
+                                            updateParams({
+                                                category: event.target.value,
+                                                page: 1,
+                                            });
+                                        }}
+                                        className="appearance-none min-w-[70px] bg-white border border-slate-300 rounded-lg pl-3 pr-8 py-1.5 text-sm font-medium text-slate-800 shadow-sm cursor-pointer outline-none transition-all duration-200 hover:border-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                    >
+                                        <option value="">All Categories</option>
+                                        {categories.map((category) => (
+                                            <option key={category.slug} value={category.slug}>
+                                                {category.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {/* Custom Chevron Arrow Icon */}
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-500">
+                                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </div>
+                                {/* <span className="text-sm text-slate-500">per page</span> */}
+                            </div>
+                            {/* category end */}
+                            {/* sort by starts */}
+                            <div className="flex items-center gap-3 font-sans">
+                                <label htmlFor="sort-select" className="text-sm font-medium text-slate-700">
+                                    Sort By
+                                </label>
+                                <div className="relative">
+                                    <select
+                                        id="sort-select"
+                                        value={sortParam}
+                                        onChange={(event) => {
+                                            updateParams({
+                                                sort: event.target.value,
+                                                page: 1,
+                                            });
+                                        }}
+                                        className="appearance-none min-w-[70px] bg-white border border-slate-300 rounded-lg pl-3 pr-8 py-1.5 text-sm font-medium text-slate-800 shadow-sm cursor-pointer outline-none transition-all duration-200 hover:border-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                    >
+                                        <option value="">Default Sort</option>
+                                        <option value="price-asc">Price: Low to High</option>
+                                        <option value="price-desc">Price: High to Low</option>
+                                        <option value="rating-desc">Rating: High to Low</option>
+                                        <option value="title-asc">Title: A to Z</option>
+                                    </select>
+                                    {/* Custom Chevron Arrow Icon */}
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-500">
+                                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </div>
+                                {/* <span className="text-sm text-slate-500">per page</span> */}
+                            </div>
+                            {/* sort by end */}
                             <div className="flex items-center gap-3 font-sans">
                                 <label htmlFor="limit-select" className="text-sm font-medium text-slate-700">
                                     Limit
