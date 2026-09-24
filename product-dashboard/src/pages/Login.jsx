@@ -1,36 +1,77 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {loginUser} from "../services/authService"
+function Login() {
+    const navigate = useNavigate();
 
-export default function Login() {
-    return <>
-        <div class="grid min-h-screen place-items-center bg-gray-100">
-                <div class="w-full max-w-xs">
-                    <form class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
-                        <div class="mb-4">
-                            <label class="block text-gray-700 text-sm font-bold mb-2" for="username">
-                                Username
-                            </label>
-                            <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="username" type="text" placeholder="Username" />
-                        </div>
-                        <div class="mb-6">
-                            <label class="block text-gray-700 text-sm font-bold mb-2" for="password">
-                                Password
-                            </label>
-                            <input class="shadow appearance-none border border-red-500 rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" id="password" type="password" placeholder="******************" />
-                            <p class="text-red-500 text-xs italic">Please choose a password.</p>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" type="button">
-                                Sign In
-                            </button>
-                            <a class="inline-block align-baseline font-bold text-sm text-blue-500 hover:text-blue-800" href="#">
-                                Forgot Password?
-                            </a>
-                        </div>
-                    </form>
-                   
-                </div>
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
+
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+
+        if (loading) return;
+
+        setError("");
+        setLoading(true);
+
+        try {
+            const data = await loginUser(username, password);
+
+            localStorage.setItem("accessToken", data.accessToken);
+
+            navigate("/products");
+        } catch (error) {
+            setError(
+                error.response?.data?.message || "Invalid username or password"
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="min-h-screen flex items-center justify-center">
+            <form onSubmit={handleSubmit} className="w-full max-w-md">
+                <h1 className="text-2xl font-bold mb-6">
+                    Login
+                </h1>
+
+                <input
+                    type="text"
+                    placeholder="Username"
+                    value={username}
+                    onChange={(event) => setUsername(event.target.value)}
+                    className="w-full border p-3 mb-4"
+                />
+
+                <input
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    className="w-full border p-3 mb-4"
+                />
+
+                {error && (
+                    <p className="text-red-500 mb-4">
+                        {error}
+                    </p>
+                )}
+
+                <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-black text-white p-3"
+                >
+                    {loading ? "Logging in..." : "Login"}
+                </button>
+            </form>
         </div>
-
-        
-
-    </>
+    );
 }
+
+export default Login;
