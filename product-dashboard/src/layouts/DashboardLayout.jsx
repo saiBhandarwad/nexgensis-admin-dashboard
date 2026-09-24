@@ -1,8 +1,17 @@
 import { useEffect, useState } from "react"
 import { logoutUser } from "../services/authService";
-import { getProducts, searchProducts, getCategories, getProductsByCategory } from "../services/productService";
+import {
+    getProducts,
+    searchProducts,
+    getCategories,
+    getProductsByCategory,
+    addProduct,
+    updateProduct,
+    deleteProduct,
+} from "../services/productService";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import useDebounce from "../hooks/Debounce";
+import ProductForm from "../components/ProductForm";
 
 export default function DashboardLayout() {
 
@@ -17,6 +26,9 @@ export default function DashboardLayout() {
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [showForm, setShowForm] = useState(false);
+    const [editingProduct, setEditingProduct] = useState(null);
+    const [saving, setSaving] = useState(false);
 
     // Read values from URL
     const [searchParams, setSearchParams] = useSearchParams();
@@ -110,7 +122,7 @@ export default function DashboardLayout() {
                     sortBy = field;
                     order = direction;
                 }
-                
+
 
                 if (searchParam) {
                     data = await searchProducts({
@@ -176,18 +188,72 @@ export default function DashboardLayout() {
 
         setSearchParams(params);
     };
-    if (loading) {
-        return <p className="w-screen h-screen flex justify-center items-center">Loading products...</p>;
-    }
+    const handleProductSubmit = async (productData) => {
+        if (saving) return;
+
+        setSaving(true);
+
+        try {
+            if (editingProduct) {
+                const updatedProduct = await updateProduct(
+                    editingProduct.id,
+                    productData
+                );
+
+                setProducts((currentProducts) =>
+                    currentProducts.map((product) =>
+                        product.id === editingProduct.id
+                            ? { ...product, ...updatedProduct }
+                            : product
+                    )
+                );
+            } else {
+                const newProduct = await addProduct(productData);
+
+                setProducts((currentProducts) => [
+                    newProduct,
+                    ...currentProducts,
+                ]);
+            }
+
+            setShowForm(false);
+            setEditingProduct(null);
+
+        } catch (error) {
+            setError("Failed to save product");
+        } finally {
+            setSaving(false);
+        }
+    };
+    const handleDeleteProduct = async (id) => {
+        const confirmed = window.confirm(
+            "Are you sure you want to delete this product?"
+        );
+
+        if (!confirmed) return;
+
+        try {
+            await deleteProduct(id);
+
+            setProducts((currentProducts) =>
+                currentProducts.filter((product) => product.id !== id)
+            );
+
+            setTotal((currentTotal) => Math.max(0, currentTotal - 1));
+
+        } catch (error) {
+            setError("Failed to delete product");
+        }
+    };
 
     return <>
         <div className="flex w-screen h-screen">
-            <div className={`md:w-[20%] bg-gray-600 px-2 fixed h-full ${sidebarOpen ? "" : "-translate-x-full"} md:static md:translate-x-[0%]`}>
-                <div className="flex justify-between my-3">
-                    <p className="text-3xl font-bold text-white">Product Admin</p>
-                    <div className="md:hidden text-2xl font-bold " onClick={() => { setSidebarOpen(false) }}>X</div>
+            <div className={`md:w-[30%] lg:w-[20%] z-50 bg-gray-600 px-2 fixed h-full transition-transform duration-300 ease-in-out ${sidebarOpen ? "" : "-translate-x-full"} md:static md:translate-x-[0%]`}>
+                <div className="flex gap-10 md:gap-0 items-center justify-between my-3">
+                    <p className="text-2xl font-bold text-white">Product Admin</p>
+                    <div className="md:hidden text-xl font text-white px-2 border-2 border-gray-500" onClick={() => { setSidebarOpen(false) }}>X</div>
                 </div>
-                <p className="text-gray-200 text-xl font-semibold cursor-pointer hover:underline">Dashboard</p>
+                <p className="text-gray-200 text-xl font-semibold cursor-pointer hover:underline">📊Dashboard</p>
                 <button type="button" onClick={handleLogout} className="fixed bottom-0 text-gray-200 flex items-center rounded-md py-2 text-sm font-semibold  cursor-pointer  transition-colors">
                     [➔ Log out
                 </button>
@@ -199,24 +265,35 @@ export default function DashboardLayout() {
                     }}>≡</div>
                     <p className="hidden md:block text-pink-500 font-bold text-2xl ms-4">Next<span className="text-olive-500">Gensis</span></p>
                     <div className="flex items-center gap-1 pe-4">
-                        <div className="bg-gray-500 w-10 h-10 flex justify-center items-center rounded-full">S</div>
-                        <span>Saiprasad</span>
+                        <div className="bg-gray-500 text-white w-10 h-10 flex justify-center items-center rounded-full">E</div>
+                        <span>Emilys</span>
                     </div>
                 </div>
                 <div className="h-auto px-5 bg-gray-200 ">
-                    <div className="flex justify-between my-5">
+                    <div className="flex justify-between items-center my-5">
                         <div>
-                            <h1 className="text-2xl font-semibold">Products</h1>
-                            <h1 className="">Manage product details, pricing, inventory and availability</h1>
+                            <h1 className="text-xl font-semibold">Products</h1>
+                            <h1 className="text-sm">Manage product details, pricing, inventory and availability</h1>
                         </div>
-                        {/* <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold rounded">Add Product</button> */}
+                        <div>
+                            <button
+                                onClick={() => {
+                                    setEditingProduct(null);
+                                    setShowForm(true);
+                                }}
+                                className="bg-blue-500 text-white px-3 py-1.5 sm:px-4 sm:py-2 text-sm sm:text-base rounded whitespace-nowrap cursor-pointer transition-colors hover:bg-blue-600"
+                            >
+                                Add Product
+                            </button>
+                        </div>
+
                     </div>
                     <div className="bg-white h-auto rounded-xl shadow-2xl">
-                        <div className="p-4 flex justify-between items-center">
+                        <div className="p-4 grid md:grid-cols-2 grid-col-2 lg:grid-cols-2 gap-4">
                             <input
                                 type="text"
                                 placeholder="Search Product here"
-                                className="bg-white border border-black outline-none p-2 rounded transition-colors duration-200 focus:border-gray-300 focus:bg-gray-50"
+                                className=" bg-white border border-black outline-none p-2 rounded transition-colors duration-200 focus:border-gray-300 focus:bg-gray-50"
                                 value={searchInput}
                                 onChange={(event) => {
                                     setSearchInput(event.target.value);
@@ -257,7 +334,7 @@ export default function DashboardLayout() {
                             </div>
                             {/* category end */}
                             {/* sort by starts */}
-                            <div className="flex items-center gap-3 font-sans">
+                            <div className=" flex items-center gap-3 font-sans">
                                 <label htmlFor="sort-select" className="text-sm font-medium text-slate-700">
                                     Sort By
                                 </label>
@@ -313,7 +390,7 @@ export default function DashboardLayout() {
                                         </svg>
                                     </div>
                                 </div>
-                                {/* <span className="text-sm text-slate-500">per page</span> */}
+                                <span className="text-sm text-slate-500">per page</span>
                             </div>
 
                         </div>
@@ -325,19 +402,83 @@ export default function DashboardLayout() {
                             <div className="">Stock</div>
                             <div className="">Action</div>
                         </div>
-                        {products.map((product) => {
-                            return <div className="grid text-center md:grid-cols-7 rounded-xl border border-gray-300 grid-cols-2 p-4 my-1 mx-1" key={product.id}>
-                                <div className="md:col-span-2 order-0 flex">
-                                    <img className="w-10 h-10 rounded-xl me-2" src={product.thumbnail} alt="" />
-                                    <p>{product.title}</p>
+                        {loading && <p className="h-full w-full flex justify-center items-center">Loading products...</p>}
+                        {!loading &&
+                            products.map((product) => (
+                                <div
+                                    key={product.id}
+                                    className="
+                border border-gray-300 rounded-xl p-4 my-2 mx-1
+                md:grid md:grid-cols-7 md:items-center md:text-center
+            "
+                                >
+                                    {/* Product */}
+                                    <div className="md:col-span-2 flex items-center mb-4 md:mb-0">
+                                        <img
+                                            className="w-12 h-12 rounded-xl mr-3 object-cover"
+                                            src={product.thumbnail}
+                                            alt={product.title}
+                                        />
+
+                                        <div className="text-left">
+                                            <p className="font-medium line-clamp-2">
+                                                {product.title}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Mobile details */}
+                                    <div className="grid grid-cols-2 gap-2 md:contents">
+                                        <div className="flex justify-between md:block">
+                                            <span className="font-semibold md:hidden">
+                                                Category
+                                            </span>
+                                            <span>{product.category}</span>
+                                        </div>
+
+                                        <div className="flex justify-between md:block">
+                                            <span className="font-semibold md:hidden">
+                                                Price
+                                            </span>
+                                            <span>${product.price}</span>
+                                        </div>
+
+                                        <div className="flex justify-between md:block">
+                                            <span className="font-semibold md:hidden">
+                                                Rating
+                                            </span>
+                                            <span>{product.rating}</span>
+                                        </div>
+
+                                        <div className="flex justify-between md:block">
+                                            <span className="font-semibold md:hidden">
+                                                Stock
+                                            </span>
+                                            <span>{product.stock}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="flex gap-4 mt-4 md:mt-0 md:justify-center">
+                                        <button
+                                            onClick={() => {
+                                                setEditingProduct(product);
+                                                setShowForm(true);
+                                            }}
+                                            className="text-blue-500 cursor-pointer"
+                                        >
+                                            Edit
+                                        </button>
+
+                                        <button
+                                            onClick={() => handleDeleteProduct(product.id)}
+                                            className="text-red-500 cursor-pointer"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="order-2 md:order-0">{product.category}</div>
-                                <div className="order-3  md:order-0">${product.price}</div>
-                                <div className="order-4  md:order-0">{product.rating}</div>
-                                <div className="order-5  md:order-0">{product.stock}</div>
-                                <div className="text-xl font-bold order-1  md:order-0">⋮</div>
-                            </div>
-                        })}
+                            ))}
                         <div className="p-4 flex justify-between">
                             <p>
                                 Showing {start}–{end} of {total}
@@ -363,5 +504,24 @@ export default function DashboardLayout() {
                 </div>
             </div>
         </div>
+        {showForm && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-xl p-6 w-full max-w-md">
+                    <h2 className="text-xl font-bold mb-4">
+                        {editingProduct ? "Edit Product" : "Add Product"}
+                    </h2>
+
+                    <ProductForm
+                        product={editingProduct}
+                        loading={saving}
+                        onCancel={() => {
+                            setShowForm(false);
+                            setEditingProduct(null);
+                        }}
+                        onSubmit={handleProductSubmit}
+                    />
+                </div>
+            </div>
+        )}
     </>
 }
